@@ -1,0 +1,3 @@
+#!/bin/bash
+
+open -a "Google Chrome" "https://chat.openai.com/?q=Hi! I'm a 42 programming student working on C projects, and I'd love some guidance from an experienced programmer. Could you help me with programming stuff in C. I prefer explanations that focus more on concepts and reasoning rather than code. I want to understand why things work so I can learn and solve problems on my own. Tips on clean coding, debugging strategies, and common pitfalls would be great! I'll share code snippets or questions as I go—feel free to respond to any of them with clear explanations don't output code. \n\n $1"
