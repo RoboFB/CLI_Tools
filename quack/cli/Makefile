@@ -112,7 +112,7 @@ clean:
 # --- Help ---
 help:
 	@echo "Available targets:"
-	@echo "  make            - Build using system libcurl (no mbedTLS required)"
-	@echo "  make portable   - Fetch and build static vendored curl + mbedTLS"
-	@echo "  make clean      - Remove build artifacts"
-	@echo "  make rebuild-libs - Force rebuild of vendored libs"
+	@echo "  mak                - Build using system libcurl"
+	@echo "  make portable      - Fetch and build static vendored curl + mbedTLS"
+	@echo "  make clean         - Remove build artifacts"
+	@echo "  make rebuild-libs  - Force rebuild of vendored libs"

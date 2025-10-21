@@ -232,24 +232,38 @@ authorized:
     resp = http_get(url, session, NULL);
 
     fprintf(stderr, "\n📡  %s response:\n", api_path);
-    if (resp && strncmp(json_get(resp, "status"), "404", 4)) {
-        if (out_file) {
-            FILE *out = fopen(out_file, "w");
-            if (out) {
-                fwrite(resp, 1, strlen(resp), out);
-                fclose(out);
-                fprintf(stderr, "📄 Response written to %s\n", out_file);
-            } else {
-                fprintf(stderr, "❌ Could not write response file.\n");
-            }
-        } else {
-            printf("%s\n", resp);
-        }
+    fprintf(stderr, "\n📡  %s response:\n", api_path);
+
+if (resp) {
+    const char *status = json_get(resp, "status");
+
+    if (status && (!strncmp(status, "404", 3) || !strncmp(status, "403", 3))) {
+        fprintf(stderr, "❌ Access denied or not found (status %s)\n", status);
         free(resp);
-    } else {
-        fprintf(stderr, "❌ Failed to fetch %s\n", api_path);
-        return (EXIT_FAILURE);
+        curl_global_cleanup();
+        return EXIT_FAILURE;
     }
+
+    // otherwise, print or save the data
+    if (out_file) {
+        FILE *out = fopen(out_file, "w");
+        if (out) {
+            fwrite(resp, 1, strlen(resp), out);
+            fclose(out);
+            fprintf(stderr, "📄 Response written to %s\n", out_file);
+        } else {
+            fprintf(stderr, "❌ Could not write response file.\n");
+        }
+    } else {
+        printf("%s\n", resp);
+    }
+
+    free(resp);
+} else {
+    fprintf(stderr, "❌ No response received.\n");
+    curl_global_cleanup();
+    return EXIT_FAILURE;
+}
 
     curl_global_cleanup();
     return 0;
