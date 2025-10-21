@@ -3,7 +3,7 @@ TARGET = quack
 SRC = cli.c
 
 # === Paths ===
-ROOT_DIR        = $(abspath $(CURDIR)/..)
+ROOT_DIR 				= $(abspath $(CURDIR)/..)
 CURL_DIR        = external/curl
 MBEDTLS_DIR     = external/mbedtls
 BUILD_DIR       = build
@@ -25,15 +25,38 @@ MAKEFLAGS += -j$(JOBS)
 # === Default target ===
 all: submodules $(OUTPUT_BIN)
 
-# --- Ensure submodules are present (file-based trigger) ---
-$(CURL_DIR)/.git $(MBEDTLS_DIR)/.git:
-	@echo "==> Initializing git submodules..."
-	git -C $(CURDIR) submodule update --init --recursive
+HAS_CURL := $(shell [ -f /usr/lib/libcurl.dylib ] && echo 1 || echo 0)
+HAS_MBEDTLS := $(shell [ -f /usr/local/lib/libmbedtls.a ] && echo 1 || echo 0)
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Darwin)
+	LDFLAGS += -framework CoreFoundation -framework SystemConfiguration
+endif
+ifeq ($(HAS_CURL),1)
+	CFLAGS  += -I/usr/include
+	LDFLAGS += -L/usr/lib -lcurl
+else
+	CFLAGS  += -I$(CURL_INSTALL)/include
+	LDFLAGS += -L$(CURL_INSTALL)/lib -lcurl
+endif
 
-submodules: $(CURL_DIR)/.git $(MBEDTLS_DIR)/.git
-	@echo "==> Submodules ready."
+ifeq ($(HAS_MBEDTLS),1)
+	LDFLAGS += -L/usr/local/lib -lmbedtls -lmbedx509 -lmbedcrypto
+else
+	LDFLAGS += -L$(MBEDTLS_INSTALL)/lib -lmbedtls -lmbedx509 -lmbedcrypto
+endif
 
-.PHONY: submodules $(CURL_DIR) $(MBEDTLS_DIR)
+# --- Ensure submodules are initialized and up to date ---
+submodules:
+	@if [ "$(HAS_CURL)" = "1" ] && [ "$(HAS_MBEDTLS)" = "1" ]; then \
+		echo "==> System libraries found (libcurl + mbedTLS); skipping submodule fetch."; \
+	else \
+		echo "==> Fetching and updating submodules..."; \
+		git -C $(ROOT_DIR) submodule sync --recursive; \
+		git -C $(ROOT_DIR) submodule update --init --recursive --remote; \
+		echo "==> Submodules ready."; \
+	fi
+
+.PHONY: submodules
 
 # --- Build mbedTLS (only if missing) ---
 $(MBEDTLS_INSTALL)/lib/libmbedtls.a: submodules
@@ -80,7 +103,12 @@ $(CURL_INSTALL)/lib/libcurl.a: submodules $(MBEDTLS_INSTALL)/lib/libmbedtls.a
 
 
 # --- Build your CLI binary ---
+# --- Build your CLI binary ---
+ifeq ($(HAS_CURL),1)
+$(OUTPUT_BIN): $(SRC)
+else
 $(OUTPUT_BIN): $(SRC) $(CURL_INSTALL)/lib/libcurl.a
+endif
 	@echo "==> Compiling $(TARGET)..."
 	mkdir -p $(BUILD_DIR)
 	$(CC) $(SRC) $(CFLAGS) $(LDFLAGS) -o $(BUILD_DIR)/$(TARGET)
