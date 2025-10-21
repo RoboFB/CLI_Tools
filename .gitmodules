@@ -1,0 +1,6 @@
+[submodule "quack/cli/external/curl"]
+	path = quack/cli/external/curl
+	url = https://github.com/curl/curl.git
+[submodule "quack/cli/external/mbedtls"]
+	path = quack/cli/external/mbedtls
+	url = https://github.com/Mbed-TLS/mbedtls.git
