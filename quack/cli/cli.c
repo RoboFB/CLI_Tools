@@ -232,7 +232,7 @@ authorized:
     resp = http_get(url, session, NULL);
 
     fprintf(stderr, "\n📡  %s response:\n", api_path);
-    if (resp) {
+    if (resp && strncmp(json_get(resp, "status"), "404", 4)) {
         if (out_file) {
             FILE *out = fopen(out_file, "w");
             if (out) {
@@ -248,6 +248,7 @@ authorized:
         free(resp);
     } else {
         fprintf(stderr, "❌ Failed to fetch %s\n", api_path);
+        return (EXIT_FAILURE);
     }
 
     curl_global_cleanup();
