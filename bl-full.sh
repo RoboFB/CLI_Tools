@@ -4,10 +4,12 @@
 
 # Get device MAC address
 
+DEVICE_NAME="soundcore\|q20i"
+
 bluetoothctl power on
 bluetoothctl discoverable on
 bluetoothctl -t 3 scan on
-DEVICE_MAC=$(bluetoothctl devices | grep -i "soundcore\|q20i" | cut -d' ' -f2 | head -1)
+DEVICE_MAC=$(bluetoothctl devices | grep -i $DEVICE_NAME | cut -d' ' -f2 | head -1)
 if [ -z "$DEVICE_MAC" ]; then
 	echo "Soundcore device not found in paired devices."
 	exit 1
@@ -23,14 +25,14 @@ if bluetoothctl info "$DEVICE_MAC" | grep -q "Connected: yes"; then
     bluetoothctl remove "$DEVICE_MAC"
     echo "✓ Device disconnected and removed!"
 else
-    echo "Connecting to Soundcore Q20i..."
+    echo "Connecting to $DEVICE_NAME..."
     
     bluetoothctl connect "$DEVICE_MAC"
     
     # Check connection status
     if bluetoothctl info "$DEVICE_MAC" | grep -q "Connected: yes"; then
-        echo "✓ Successfully connected to Soundcore device!"
-		xdg-open "https://music.youtube.com/" 2>/dev/null &
+        echo "✓ Successfully connected to $DEVICE_NAME device!"
+		xdg-open "https://music.youtube.com/" 2>/dev/null & # Open YouTube Music in default browser can be removed if not needed
     else
         echo "✗ Failed to connect. Device may not be in pairing mode or not found."
     fi
