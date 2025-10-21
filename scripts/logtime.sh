@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- detect script directory (where me.json, loc.json, and quack live) ---
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE/../build[0]}")" && pwd)"
 MEFILE="$SCRIPT_DIR/me.json"
 LOCFILE="$SCRIPT_DIR/loc.json"
 QUACK="$SCRIPT_DIR/quack"

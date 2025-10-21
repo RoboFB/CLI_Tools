@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Folder containing your script files
-SCRIPTS_DIR="./scripts"   # change this to your path
-BIN_DIR="./build"
+SCRIPTS_DIR="./quack/scripts"   # change this to your path
+BIN_DIR="./quack/cli/build"
 PARAMETER_IS_VALID=0
 
 # Collect all script and bin files

@@ -21,7 +21,7 @@ AGE=$(( NOW - MOD_TIME ))
 
 if [ ! -f "$FILE" ] || [ $AGE -gt $MAX_AGE ]; then
   echo "🔄 Fetching fresh data..."
-  ./quack -o "$FILE" "/v2/users/modiepge" 2> /dev/null
+  ./quack -o "$FILE" "/v2/users/me" 2> /dev/null
 else
   echo "✅ Using cached data ($FILE, ${AGE}s old)"
 fi
