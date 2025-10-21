@@ -1,10 +1,13 @@
 #!/bin/bash
 
-MEFILE="me.json"
-LOCFILE="loc.json"
+# --- detect script directory (where me.json, loc.json, and quack live) ---
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MEFILE="$SCRIPT_DIR/me.json"
+LOCFILE="$SCRIPT_DIR/loc.json"
+QUACK="$SCRIPT_DIR/quack"
 MAX_AGE=300   # seconds (5 minutes)
 
-# Function: get file modification time safely
+# --- helper: get file modification time safely ---
 get_mtime() {
   if [ -f "$1" ]; then
     if stat --version >/dev/null 2>&1; then
@@ -17,22 +20,22 @@ get_mtime() {
   fi
 }
 
-# Current timestamp
+# --- current timestamp ---
 NOW=$(date +%s)
 
-# --- Ensure me.json exists and is recent ---
+# --- ensure me.json exists and is recent ---
 ME_MOD_TIME=$(get_mtime "$MEFILE")
 ME_AGE=$(( NOW - ME_MOD_TIME ))
 
 if [ ! -f "$MEFILE" ]; then
   echo "📄 No me.json found — fetching..."
-  ./quack -o "$MEFILE" "/v2/me" 2>/dev/null || {
+  "$QUACK" -o "$MEFILE" "/v2/me" 2>/dev/null || {
     echo "❌ Failed to fetch /v2/me"
     exit 1
   }
 elif [ $ME_AGE -gt $MAX_AGE ]; then
   echo "🔄 Refreshing stale me.json ($ME_AGE seconds old)..."
-  ./quack -o "$MEFILE" "/v2/me" 2>/dev/null || {
+  "$QUACK" -o "$MEFILE" "/v2/me" 2>/dev/null || {
     echo "❌ Failed to refresh /v2/me"
     exit 1
   }
@@ -40,20 +43,20 @@ else
   echo "✅ Using cached me.json ($MEFILE, ${ME_AGE}s old)"
 fi
 
-# --- Extract user ID ---
+# --- extract user ID ---
 USER_ID=$(jq -r '.id // empty' "$MEFILE")
 if [ -z "$USER_ID" ]; then
   echo "❌ Could not extract user ID from $MEFILE"
   exit 1
 fi
 
-# --- Ensure loc.json is up-to-date ---
+# --- ensure loc.json is up-to-date ---
 LOC_MOD_TIME=$(get_mtime "$LOCFILE")
 LOC_AGE=$(( NOW - LOC_MOD_TIME ))
 
 if [ ! -f "$LOCFILE" ] || [ $LOC_AGE -gt $MAX_AGE ]; then
   echo "🔄 Fetching fresh location data..."
-  ./quack -o "$LOCFILE" "/v2/users/$USER_ID/locations" 2>/dev/null || {
+  "$QUACK" -o "$LOCFILE" "/v2/users/$USER_ID/locations" 2>/dev/null || {
     echo "❌ Failed to fetch location data"
     exit 1
   }
@@ -61,20 +64,19 @@ else
   echo "✅ Using cached location data ($LOCFILE, ${LOC_AGE}s old)"
 fi
 
-# --- Colors ---
+# --- colors ---
 GREEN=$'\033[1;32m'
 YELLOW=$'\033[1;33m'
 RED=$'\033[1;31m'
 RESET=$'\033[0m'
+BOLD=$'\033[1m'
 
-# --- Time range ---
+# --- time range ---
 ONE_WEEK_AGO=$(date -d '7 days ago' +%s 2>/dev/null || date -v-7d +%s)
+TODAY=$(date +%Y-%m-%d)
 
 echo "🕓 Logtime summary (last 7 days):"
 echo "──────────────────────────────────────────────"
-
-TODAY=$(date +%Y-%m-%d)
-BOLD=$'\033[1m'
 
 jq -r --argjson weekago "$ONE_WEEK_AGO" '
   map(select(.begin_at != null and .end_at != null)) |
@@ -105,7 +107,7 @@ jq -r --argjson weekago "$ONE_WEEK_AGO" '
     color="$RED"
   fi
 
-  # Bold today’s row
+  # Bold today's row
   if [[ "$day" == "$TODAY" ]]; then
     printf "${BOLD}%-12s ${color}%6.2f hrs${RESET}\n" "$day" "$hours"
   else

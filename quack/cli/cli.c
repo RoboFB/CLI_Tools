@@ -3,6 +3,13 @@
 #include <string.h>
 #include <unistd.h>
 #include <curl/curl.h>
+#include <libgen.h>
+#include <limits.h>
+#include <sys/stat.h>
+
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif
 
 #define BROKER_BASE "https://quack.moritzdiepgen.de"
 #define POLL_INTERVAL 3
@@ -112,14 +119,40 @@ void unescape_slashes(char *s) {
     *dst = 0;
 }
 
+/* ---- executable directory detection ---- */
+static char session_path[PATH_MAX];
+
+static void get_executable_dir(char *buf, size_t len) {
+#ifdef __linux__
+    ssize_t n = readlink("/proc/self/exe", buf, len - 1);
+    if (n > 0) {
+        buf[n] = '\0';
+        char *slash = strrchr(buf, '/');
+        if (slash) *slash = '\0';
+    } else {
+        strncpy(buf, ".", len);
+    }
+#elif __APPLE__
+    uint32_t size = (uint32_t)len;
+    if (_NSGetExecutablePath(buf, &size) == 0) {
+        char *slash = strrchr(buf, '/');
+        if (slash) *slash = '\0';
+    } else {
+        strncpy(buf, ".", len);
+    }
+#else
+    strncpy(buf, ".", len);
+#endif
+}
+
 /* ---- Session persistence ---- */
 void save_session(const char *sid) {
-    FILE *f = fopen(SESSION_FILE, "w");
+    FILE *f = fopen(session_path, "w");
     if (f) { fprintf(f, "%s", sid); fclose(f); }
 }
 
 int load_session(char *sid, size_t len) {
-    FILE *f = fopen(SESSION_FILE, "r");
+    FILE *f = fopen(session_path, "r");
     if (!f) return 0;
     if (!fgets(sid, len, f)) { fclose(f); return 0; }
     fclose(f);
@@ -130,6 +163,12 @@ int load_session(char *sid, size_t len) {
 /* ---- Main ---- */
 int main(int argc, char **argv) {
     curl_global_init(CURL_GLOBAL_DEFAULT);
+
+    // Resolve session path based on binary location
+    char exe_dir[PATH_MAX];
+    get_executable_dir(exe_dir, sizeof(exe_dir));
+    snprintf(session_path, sizeof(session_path), "%s/%s", exe_dir, SESSION_FILE);
+
     char url[1024];
     char session[128] = {0};
     char *resp;
@@ -153,13 +192,12 @@ int main(int argc, char **argv) {
         if (resp) {
             char *st = json_get(resp, "status");
             if (st && strcmp(st, "authorized") == 0) {
-                //fprintf(stderr, "🔁 Using saved session: %s\n", session);
                 free(resp);
                 goto authorized;
             }
             free(resp);
         }
-        fprintf(stderr, "⚠️ Saved session invalid or expired. Starting new authorization.\n");
+        fprintf(stderr, "⚠️  Saved session invalid or expired. Starting new authorization.\n");
     }
 
     /* 1️⃣ Create new session */
@@ -186,7 +224,6 @@ int main(int argc, char **argv) {
     }
     unescape_slashes(login);
 
-    //fprintf(stderr, "Session ID: %s\n", session);
     fprintf(stderr, "Open this URL in your browser:\n\n  %s\n\n", login);
     free(resp);
 
@@ -232,38 +269,37 @@ authorized:
     resp = http_get(url, session, NULL);
 
     fprintf(stderr, "\n📡  %s response:\n", api_path);
-    fprintf(stderr, "\n📡  %s response:\n", api_path);
 
-if (resp) {
-    const char *status = json_get(resp, "status");
+    if (resp) {
+        const char *status = json_get(resp, "status");
 
-    if (status && (!strncmp(status, "404", 3) || !strncmp(status, "403", 3))) {
-        fprintf(stderr, "❌ Access denied or not found (status %s)\n", status);
+        if (status && (!strncmp(status, "404", 3) || !strncmp(status, "403", 3))) {
+            fprintf(stderr, "❌ Access denied or not found (status %s)\n", status);
+            free(resp);
+            curl_global_cleanup();
+            return EXIT_FAILURE;
+        }
+
+        // otherwise, print or save the data
+        if (out_file) {
+            FILE *out = fopen(out_file, "w");
+            if (out) {
+                fwrite(resp, 1, strlen(resp), out);
+                fclose(out);
+                fprintf(stderr, "📄 Response written to %s\n", out_file);
+            } else {
+                fprintf(stderr, "❌ Could not write response file.\n");
+            }
+        } else {
+            printf("%s\n", resp);
+        }
+
         free(resp);
+    } else {
+        fprintf(stderr, "❌ No response received.\n");
         curl_global_cleanup();
         return EXIT_FAILURE;
     }
-
-    // otherwise, print or save the data
-    if (out_file) {
-        FILE *out = fopen(out_file, "w");
-        if (out) {
-            fwrite(resp, 1, strlen(resp), out);
-            fclose(out);
-            fprintf(stderr, "📄 Response written to %s\n", out_file);
-        } else {
-            fprintf(stderr, "❌ Could not write response file.\n");
-        }
-    } else {
-        printf("%s\n", resp);
-    }
-
-    free(resp);
-} else {
-    fprintf(stderr, "❌ No response received.\n");
-    curl_global_cleanup();
-    return EXIT_FAILURE;
-}
 
     curl_global_cleanup();
     return 0;
